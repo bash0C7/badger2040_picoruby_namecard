@@ -268,17 +268,17 @@ wait_until_idle(busy)
 GC.start
 
 # === レイアウト設計 ===
-# Option B: テキスト上中央、QR下（バランス最適）
+# Option C: 横並び（テキスト左側、QR右側）
 text = "bash0C7"
 text_width = FONT_WIDTH * text.size
-text_x = (WIDTH - text_width) / 2
-text_y = 270
+text_x = 5
+text_y = 150
 
 qr_width = QR_WIDTH
-qr_module_size = 2
+qr_module_size = 1
 qr_display_size = qr_width * qr_module_size
-qr_x = (WIDTH - qr_display_size) / 2
-qr_y = 30
+qr_x = 65
+qr_y = 60
 
 # === 描画実行 ===
 puts "Line 293: Drawing text..."
