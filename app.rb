@@ -1,26 +1,32 @@
-p "start"
 require 'spi'
 require 'gpio'
 require 'terminus'
-p "require"
+
+# === フォント データ定義 ===
+# Shinonome ascii12 フォント（6×12）
+# 出典: picoruby-shinonome mrbgem
+FONT_SHINONOME = :ascii12
+FONT_WIDTH = 6
+FONT_HEIGHT = 12
 
 WIDTH  = 128
 HEIGHT = 296
 
+# === QR コード データ ===
+# 出典: qr.png を Python で解析して抽出（27×27 モジュール）
+QR_WIDTH = 27
+QR_HEIGHT = 27
+QR_DATA = "\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\x80"
+
 def send_command(spi, cs, dc, cmd, label = "")
-  puts ">CMD #{label} 0x#{cmd.to_s(16).rjust(2, '0')}" unless label.empty?
   dc.write(0); cs.write(0); spi.write(cmd.chr); cs.write(1)
-  puts "<CMD #{label}" unless label.empty?
 end
 
 def send_data(spi, cs, dc, data, label = "")
-  puts ">DAT #{label} size=#{data.size}" unless label.empty?
   dc.write(1); cs.write(0); spi.write(data); cs.write(1)
-  puts "<DAT #{label}" unless label.empty?
 end
 
 def send_data_chunked(spi, cs, dc, data, label = "")
-  puts ">DAT #{label} size=#{data.size} (chunked)" unless label.empty?
   dc.write(1); cs.write(0)
   i = 0
   while i < data.size
@@ -29,12 +35,169 @@ def send_data_chunked(spi, cs, dc, data, label = "")
     i += 1024
   end
   cs.write(1)
-  puts "<DAT #{label}" unless label.empty?
 end
 
 def wait_until_idle(busy)
   sleep_ms(10)
   while busy.read == 0; sleep_ms(10); end
+end
+
+# === Drawing Primitives ===
+
+# set_pixel: フレームバッファ内の単一ピクセルを設定
+def set_pixel(fb, x, y, color)
+  return if x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT
+  byte_idx = (y * WIDTH + x) / 8
+  bit_idx = 7 - (x % 8)
+  old_val = fb[byte_idx].ord
+  if color == 0
+    new_val = old_val & ~(1 << bit_idx)
+  else
+    new_val = old_val | (1 << bit_idx)
+  end
+  fb[byte_idx] = new_val.chr
+end
+
+# fill_rect: 矩形領域を塗りつぶす
+def fill_rect(fb, x, y, width, height, color)
+  (0...height).each do |dy|
+    (0...width).each do |dx|
+      set_pixel(fb, x + dx, y + dy, color)
+    end
+  end
+end
+
+# draw_line: Bresenham アルゴリズムで直線を描画
+def draw_line(fb, x0, y0, x1, y1, color)
+  dx = (x1 - x0).abs
+  dy = (y1 - y0).abs
+  sx = x0 < x1 ? 1 : -1
+  sy = y0 < y1 ? 1 : -1
+
+  if dy == 0
+    fill_rect(fb, [x0, x1].min, y0, (dx + 1), 1, color)
+    return
+  end
+
+  if dx == 0
+    fill_rect(fb, x0, [y0, y1].min, 1, (dy + 1), color)
+    return
+  end
+
+  if dx > dy
+    err = dx / 2
+    y = y0
+    x = x0
+    while true
+      set_pixel(fb, x, y, color)
+      break if x == x1
+      err -= dy
+      if err < 0
+        y += sy
+        err += dx
+      end
+      x += sx
+    end
+  else
+    err = dy / 2
+    x = x0
+    y = y0
+    while true
+      set_pixel(fb, x, y, color)
+      break if y == y1
+      err -= dx
+      if err < 0
+        x += sx
+        err += dy
+      end
+      y += sy
+    end
+  end
+end
+
+# draw_text: テキスト文字列を Shinonome フォントで描画
+def draw_text(fb, x, y, text, color = 0, font_name = :ascii12)
+  Shinonome.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
+    current_x = x
+    widths.each_with_index do |char_width, char_idx|
+      height.times do |row|
+        glyph_data = glyphs[char_idx][row]
+        char_width.times do |col|
+          pixel = (glyph_data >> (char_width - 1 - col)) & 1
+          pixel_color = (pixel == 1) ? color : (1 - color)
+          display_x = current_x + col
+          display_y = y + row
+          set_pixel(fb, display_x, display_y, pixel_color)
+        end
+      end
+      current_x += char_width
+    end
+  end
+end
+
+# draw_qr_code: QR コード データから QR コードを描画
+def draw_qr_code(fb, x, y, qr_data, module_size, qr_width = 27)
+  qr_bytes = []
+  i = 0
+  while i < qr_data.size
+    if qr_data[i] == '\\'
+      hex_chars = qr_data[i+1..i+2]
+      qr_bytes.push(hex_chars.to_i(16))
+      i += 3
+    else
+      i += 1
+    end
+  end
+
+  qr_bits = []
+  qr_bytes.each do |byte|
+    8.times do |bit|
+      qr_bits.push((byte >> (7 - bit)) & 1)
+    end
+  end
+
+  qr_height = qr_width
+  qr_bits[0...qr_width * qr_height].each_with_index do |bit, idx|
+    mx = idx % qr_width
+    my = idx / qr_width
+    color = (bit == 1) ? 0 : 1
+    display_x = x + mx * module_size
+    display_y = y + my * module_size
+    fill_rect(fb, display_x, display_y, module_size, module_size, color)
+  end
+end
+
+# draw_circle: Midpoint Circle アルゴリズムで円を描画
+def draw_circle(fb, cx, cy, radius, color, filled = false)
+  x = radius
+  y = 0
+  d = 3 - 2 * radius
+
+  while x >= y
+    if filled
+      draw_line(fb, cx - x, cy + y, cx + x, cy + y, color)
+      draw_line(fb, cx - x, cy - y, cx + x, cy - y, color) if y != 0
+      draw_line(fb, cx - y, cy + x, cx + y, cy + x, color) if x != y
+      draw_line(fb, cx - y, cy - x, cx + y, cy - x, color) if y != 0 && x != y
+    else
+      set_pixel(fb, cx + x, cy + y, color)
+      set_pixel(fb, cx - x, cy + y, color)
+      set_pixel(fb, cx + x, cy - y, color)
+      set_pixel(fb, cx - x, cy - y, color)
+      set_pixel(fb, cx + y, cy + x, color)
+      set_pixel(fb, cx - y, cy + x, color)
+      set_pixel(fb, cx + y, cy - x, color) if x != y
+      set_pixel(fb, cx - y, cy - x, color) if x != y
+    end
+
+    if d < 0
+      d = d + 4 * y + 6
+    else
+      d = d + 4 * (y - x) + 10
+      x -= 1
+    end
+    y += 1
+  end
 end
 
 # === 初期化 ===
@@ -44,11 +207,10 @@ dc   = GPIO.new(20, GPIO::OUT)
 rst  = GPIO.new(21, GPIO::OUT); rst.write(1)
 busy = GPIO.new(26, GPIO::IN)
 pwr3v3 = GPIO.new(10, GPIO::OUT); pwr3v3.write(1)
-p "new"
 
+# ハードウェア リセット
 rst.write(0); sleep_ms(200); rst.write(1); sleep_ms(200)
 wait_until_idle(busy)
-p "reset"
 
 # UC8151C 初期化（128x296モード）
 send_command(spi, cs, dc, 0x00, "PSR")
@@ -77,15 +239,12 @@ send_data(spi, cs, dc, "\x22", "TCON.data")
 
 GC.start
 
-# === フレームバッファ ===
-p "framebuffer_init"
+# === フレームバッファ作成 ===
 @framebuffer = "\xFF" * (WIDTH * HEIGHT / 8)
-p "f init done"
 
 GC.start
 
-# === Deep Clean: チップメモリをリセット（強制クリーン：全黒→全白） ===
-p "deep_clean_start"
+# === Deep Clean: チップメモリをリセット ===
 send_command(spi, cs, dc, 0x10, "DTM1")
 send_data_chunked(spi, cs, dc, "\x00" * 4736, "DTM1_all_black")
 
@@ -94,52 +253,30 @@ send_data_chunked(spi, cs, dc, "\xFF" * 4736, "DTM2_all_white")
 
 send_command(spi, cs, dc, 0x12, "DRF")
 wait_until_idle(busy)
-p "deep_clean_done"
 
 GC.start
 
-# === 描画テスト：左下 5x5 の黒領域 ===
-# 座標系: 原点左下、x軸=左→右、y軸=下→上
-# 行指向メモリレイアウト: byte_idx = (y * WIDTH + x) / 8
-# MSB first: bit_idx = 7 - (x % 8)
-p "draw_simple_test"
-pixel_count = 0
-drawn_bytes = {}
+# === レイアウト設計 ===
+# Option B: テキスト上中央、QR下（バランス最適）
+text = "bash0C7"
+text_width = FONT_WIDTH * text.size
+text_x = (WIDTH - text_width) / 2
+text_y = 270
 
-(0..4).each do |y|
-  (0..4).each do |x|
-    byte_idx = (y * WIDTH + x) / 8
-    bit_idx = 7 - (x % 8)
-    puts "pix#{pixel_count}: x=#{x} y=#{y} byte=#{byte_idx} bit=#{bit_idx}"
-    old_val = @framebuffer[byte_idx].ord
-    new_val = old_val & ~(1 << bit_idx)
-    @framebuffer[byte_idx] = new_val.chr
-    drawn_bytes[byte_idx] = true
-    pixel_count += 1
-  end
-end
+qr_width = QR_WIDTH
+qr_module_size = 2
+qr_display_size = qr_width * qr_module_size
+qr_x = (WIDTH - qr_display_size) / 2
+qr_y = 30
 
-p "draw_simple_test: #{pixel_count} pixels"
-
+# === 描画実行 ===
+draw_text(@framebuffer, text_x, text_y, text, 0, :ascii12)
 GC.start
 
-# === フレームバッファ検証：0xFF以外のバイトを全て出力 ===
-p "framebuffer_scan"
-non_white_count = 0
-(0...@framebuffer.size).each do |i|
-  val = @framebuffer[i].ord
-  if val != 0xFF
-    expected = drawn_bytes[i] ? "OK" : "UNEXPECTED"
-    puts "fb[#{i}]=0x#{val.to_s(16).rjust(2, '0')} #{expected}"
-    non_white_count += 1
-  end
-end
-p "framebuffer_scan: #{non_white_count} non-white bytes"
-
+draw_qr_code(@framebuffer, qr_x, qr_y, QR_DATA, qr_module_size, QR_WIDTH)
 GC.start
 
 # === 画面更新 ===
-# DTM1には真っ白を送ってリセット、DTM2に描画画像を送る
 send_command(spi, cs, dc, 0x10, "DTM1")
 send_data_chunked(spi, cs, dc, "\xFF" * 4736, "DTM1.data")
 
@@ -158,5 +295,4 @@ send_command(spi, cs, dc, 0x02, "POF")
 
 GC.start
 
-puts "Done: 5x5 black square at bottom-left (0,0)-(4,4)"
-puts "Result: Displayed at top-right (coordinate system origin is bottom-left)"
+puts "Done: bash0C7 namecard displayed"
