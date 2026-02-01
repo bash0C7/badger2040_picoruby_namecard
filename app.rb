@@ -60,6 +60,23 @@ def set_pixel(fb, x, y, color)
   fb[byte_idx] = new_val.chr
 end
 
+# fill_rect: 矩形領域を塗りつぶす
+# fb: フレームバッファ（文字列）
+# x, y: 左下のコーナー座標（原点左下）
+# width, height: 幅と高さ（ピクセル）
+# color: 0=黒、1=白
+# 実装: set_pixel() を活用した単純版
+# 参考: C++ Pimoroni はバイト単位で最適化、MicroPython framebuf も同様アプローチ
+def fill_rect(fb, x, y, width, height, color)
+  # 高さループ（y軸：下から上へ）
+  (0...height).each do |dy|
+    # 幅ループ（x軸：左から右へ）
+    (0...width).each do |dx|
+      set_pixel(fb, x + dx, y + dy, color)
+    end
+  end
+end
+
 
 # === 初期化 ===
 spi = SPI.new(unit: :RP2040_SPI0, frequency: 2_000_000, sck_pin: 18, copi_pin: 19, mode: 0)
@@ -177,6 +194,55 @@ new_byte = test_fb4[0].ord
 puts "Test4 (128,0) and (0,296) out of bounds: byte[0] unchanged=#{orig_byte == new_byte}"
 
 p "set_pixel_test: done"
+
+# === fill_rect() テストケース ===
+p "fill_rect_test: detailed verification"
+
+# テスト1: バイト境界アライン 8x10 矩形
+test_fb_rect = "\xFF" * 4736
+fill_rect(test_fb_rect, 0, 0, 8, 10, 0)  # 0=黒
+# 期待値: y=0-9 のそれぞれで、byte_idx = (y * 128 + 0-7) / 8 = y * 16 が変更される
+rect1_bytes = 0
+(0..9).each do |y|
+  byte_idx = y * 16  # y * WIDTH / 8
+  if test_fb_rect[byte_idx].ord != 0xFF
+    rect1_bytes += 1
+  end
+end
+puts "Test1 (0,0,8,10) black rect: #{rect1_bytes}/10 bytes modified as expected"
+
+# テスト2: 非アライン矩形 10x8 (x=3, y=5)
+test_fb_rect2 = "\xFF" * 4736
+fill_rect(test_fb_rect2, 3, 5, 10, 8, 0)  # 0=黒
+# 10ピクセル幅は複数バイトにまたがる
+rect2_non_white = 0
+(0...test_fb_rect2.size).each do |i|
+  rect2_non_white += 1 if test_fb_rect2[i].ord != 0xFF
+end
+puts "Test2 (3,5,10,8) black rect: #{rect2_non_white} bytes modified"
+
+# テスト3: フルスクリーン黒 (全バイト = 0x00)
+test_fb_full = "\xFF" * 4736
+fill_rect(test_fb_full, 0, 0, WIDTH, HEIGHT, 0)
+full_black_bytes = 0
+(0...test_fb_full.size).each do |i|
+  full_black_bytes += 1 if test_fb_full[i].ord == 0x00
+end
+puts "Test3 (0,0,128,296) full black: #{full_black_bytes}/4736 bytes = 0x00"
+
+# テスト4: 白矩形 16x16
+test_fb_white = "\x00" * 4736  # 全黒スタート
+fill_rect(test_fb_white, 0, 0, 16, 16, 1)  # 1=白
+white_rect_bytes = 0
+(0...test_fb_white.size).each do |i|
+  val = test_fb_white[i].ord
+  if val != 0x00
+    white_rect_bytes += 1
+  end
+end
+puts "Test4 (0,0,16,16) white rect: #{white_rect_bytes} bytes modified"
+
+p "fill_rect_test: done"
 
 GC.start
 
