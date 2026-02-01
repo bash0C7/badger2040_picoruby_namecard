@@ -11,9 +11,9 @@ require 'terminus'
 puts "Line 6: Terminus loaded"
 
 # === フォント データ定義 ===
-# Shinonome ascii12 フォント（6×12）
-# 出典: picoruby-shinonome mrbgem
-FONT_SHINONOME = :ascii12
+# Terminus 6x12 フォント（6×12）
+# 出典: picoruby-terminus mrbgem
+FONT_TERMINUS = :"6x12"
 FONT_WIDTH = 6
 FONT_HEIGHT = 12
 
@@ -124,7 +124,7 @@ def draw_line(fb, x0, y0, x1, y1, color)
 end
 
 # draw_text: テキスト文字列を Terminus フォントで描画
-def draw_text(fb, x, y, text, color = 0, font_name = :ascii12)
+def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     current_x = x
     widths.each_with_index do |char_width, char_idx|
@@ -291,7 +291,7 @@ qr_y = 30
 
 # === 描画実行 ===
 puts "Line 293: Drawing text..."
-draw_text(@framebuffer, text_x, text_y, text, 0, :ascii12)
+draw_text(@framebuffer, text_x, text_y, text, 0, :"6x12")
 GC.start
 puts "Line 296: Text drawn"
 
