@@ -183,30 +183,22 @@ def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
   end
 end
 
-# draw_qr_code_bytes: バイト配列からQRコードを描画
-def draw_qr_code_bytes(fb, x, y, qr_data, qr_width, qr_height, scale)
-  qr_data.each_with_index do |byte_val, idx|
-    8.times do |bit_pos|
-      # ビットを取得（MSBファースト）
-      bit = (byte_val >> (7 - bit_pos)) & 1
+# draw_checkerboard: 市松模様を描画（描画システムの検証用）
+# experiment.rb と同じ set_pixel ベースパターン
+def draw_checkerboard(fb, x, y, width, height, cell_size)
+  (height / cell_size).times do |row|
+    (width / cell_size).times do |col|
+      # 市松模様パターン
+      color = (row + col) % 2 == 0 ? 0 : 1  # 黒 or 白
 
-      # QRコード内の座標を計算
-      pixel_idx = idx * 8 + bit_pos
-      mx = pixel_idx % qr_width
-      my = pixel_idx / qr_width
-
-      # 範囲チェック
-      break if my >= qr_height
-
-      # ビット値から色へ変換（1=黒、0=白）※OLED データは反転
-      color = 1 - bit
-
-      # 表示座標を計算
-      display_x = x + mx * scale
-      display_y = y + my * scale
-
-      # スケーリングして描画
-      fill_rect(fb, display_x, display_y, scale, scale, color)
+      # セルを塗りつぶす（set_pixel で1ピクセルずつ）
+      cell_size.times do |dy|
+        cell_size.times do |dx|
+          px = x + col * cell_size + dx
+          py = y + row * cell_size + dy
+          set_pixel(fb, px, py, color)
+        end
+      end
     end
   end
 end
@@ -317,7 +309,7 @@ GC.start
 text = "bash0C7"
 text_width = FONT_WIDTH * text.size
 text_x = 5
-text_y = 150
+text_y = 260  # 下部（市松模様の下）
 
 qr_scale = 2  # 62×2 = 124ピクセル
 qr_display_size = QR_WIDTH * qr_scale
@@ -330,10 +322,11 @@ puts "Line 293: Drawing text..."
 GC.start
 puts "Line 296: Text drawn"
 
-puts "Line 298: Drawing QR code..."
-draw_qr_code_bytes(@framebuffer, qr_x, qr_y, QR_DATA, QR_WIDTH, QR_HEIGHT, qr_scale)
+puts "Line 298: Drawing checkerboard (Phase 0 test)..."
+# 市松模様で描画システムを検証（128×128、8×8ピクセルセル）
+draw_checkerboard(@framebuffer, 0, 50, 128, 128, 8)
 GC.start
-puts "Line 301: QR code drawn"
+puts "Line 301: Checkerboard drawn"
 
 # === 画面更新 ===
 puts "Line 304: Starting display update..."
