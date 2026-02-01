@@ -251,6 +251,7 @@ def draw_line(fb, x0, y0, x1, y1, color)
 end
 
 # draw_text: テキスト文字列を Terminus フォントで描画
+# 修正版: glyph_data は上下反転で返されるので height-1-row でアクセス
 def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     # 文字ごとに描画（水平レンダリング）
@@ -258,13 +259,11 @@ def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
     widths.each_with_index do |char_width, char_idx|
       glyph_data = glyphs[char_idx]
 
-      # 各文字の行ごとに描画
-      height.times do |row|
-        row_data = glyph_data[row]
-
-        # 1文字内のピクセルを描画
-        char_width.times do |col|
-          pixel = (row_data >> (char_width - 1 - col)) & 1
+      # 列を外側ループに、行を内側ループに
+      char_width.times do |col|
+        height.times do |row|
+          row_data = glyph_data[height - 1 - row]  # 行を反転
+          pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
           pixel_color = (pixel == 1) ? color : (1 - color)
           display_x = current_x + col
           display_y = y + row
@@ -279,6 +278,7 @@ def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
 end
 
 # draw_text_scaled: テキストをスケーリング付きで描画（各ピクセルをスケール倍で描画）
+# 修正版: glyph_data は上下反転で返されるので height-1-row でアクセス
 def draw_text_scaled(fb, x, y, text, scale = 2, color = 0, font_name = :"6x12")
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     # 文字ごとに描画（水平レンダリング）
@@ -286,13 +286,11 @@ def draw_text_scaled(fb, x, y, text, scale = 2, color = 0, font_name = :"6x12")
     widths.each_with_index do |char_width, char_idx|
       glyph_data = glyphs[char_idx]
 
-      # 各文字の行ごとに描画
-      height.times do |row|
-        row_data = glyph_data[row]
-
-        # 1文字内のピクセルを描画（スケーリング適用）
-        char_width.times do |col|
-          pixel = (row_data >> (char_width - 1 - col)) & 1
+      # 列を外側ループに、行を内側ループに
+      char_width.times do |col|
+        height.times do |row|
+          row_data = glyph_data[height - 1 - row]  # 行を反転
+          pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
           pixel_color = (pixel == 1) ? color : (1 - color)
 
           # スケール倍で描画（各ピクセルを scale×scale ブロックで表現）

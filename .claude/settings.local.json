@@ -5,7 +5,8 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nReplace Shinonome with Terminus for font rendering\n\n- Remove shinonome require statement \\(not in released PicoRuby\\)\n- Update draw_text\\(\\) to use Terminus.draw\\(\\) instead of Shinonome.draw\\(\\)\n- Add debug puts statements to trace execution progress\n- Update CLAUDE.md to clarify: DO NOT run rake compile/deploy or ./app.mrb \\(user must do manually\\)\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(head:*)"
     ]
   }
 }
