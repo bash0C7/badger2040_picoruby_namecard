@@ -33,6 +33,8 @@ When implementing changes:
 3. DO NOT push to remote unless user explicitly requests
 4. User will verify functionality AFTER commit (not before)
 5. **Always investigate before answering** - NEVER speculate about code you have not opened
+6. **DO NOT run `rake compile` or `rake deploy`** - User must build and deploy manually
+7. **DO NOT run `./app.mrb`** - User must test manually
 
 ---
 

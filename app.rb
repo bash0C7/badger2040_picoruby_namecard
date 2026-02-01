@@ -1,6 +1,14 @@
+puts "Line 1: Loading SPI..."
 require 'spi'
+puts "Line 2: SPI loaded"
+
+puts "Line 3: Loading GPIO..."
 require 'gpio'
+puts "Line 4: GPIO loaded"
+
+puts "Line 5: Loading Terminus..."
 require 'terminus'
+puts "Line 6: Terminus loaded"
 
 # === フォント データ定義 ===
 # Shinonome ascii12 フォント（6×12）
@@ -115,9 +123,9 @@ def draw_line(fb, x0, y0, x1, y1, color)
   end
 end
 
-# draw_text: テキスト文字列を Shinonome フォントで描画
+# draw_text: テキスト文字列を Terminus フォントで描画
 def draw_text(fb, x, y, text, color = 0, font_name = :ascii12)
-  Shinonome.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
+  Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     current_x = x
     widths.each_with_index do |char_width, char_idx|
       height.times do |row|
@@ -201,20 +209,28 @@ def draw_circle(fb, cx, cy, radius, color, filled = false)
 end
 
 # === 初期化 ===
+puts "Line 220: Starting initialization..."
 spi = SPI.new(unit: :RP2040_SPI0, frequency: 2_000_000, sck_pin: 18, copi_pin: 19, mode: 0)
+puts "Line 221: SPI initialized"
+puts "Line 222: Initializing GPIO pins..."
 cs   = GPIO.new(17, GPIO::OUT); cs.write(1)
 dc   = GPIO.new(20, GPIO::OUT)
 rst  = GPIO.new(21, GPIO::OUT); rst.write(1)
 busy = GPIO.new(26, GPIO::IN)
 pwr3v3 = GPIO.new(10, GPIO::OUT); pwr3v3.write(1)
+puts "Line 228: GPIO pins initialized"
 
 # ハードウェア リセット
+puts "Line 230: Performing hardware reset..."
 rst.write(0); sleep_ms(200); rst.write(1); sleep_ms(200)
 wait_until_idle(busy)
+puts "Line 233: Hardware reset complete"
 
 # UC8151C 初期化（128x296モード）
+puts "Line 235: Starting UC8151 initialization..."
 send_command(spi, cs, dc, 0x00, "PSR")
 send_data(spi, cs, dc, "\x5F", "PSR.data")
+puts "Line 238: PSR configured"
 
 send_command(spi, cs, dc, 0x01, "PWR")
 send_data(spi, cs, dc, "\x03\x00\x2b\x2b\x1e", "PWR.data")
@@ -240,13 +256,17 @@ send_data(spi, cs, dc, "\x22", "TCON.data")
 GC.start
 
 # === フレームバッファ作成 ===
+puts "Line 268: Creating framebuffer..."
 @framebuffer = "\xFF" * (WIDTH * HEIGHT / 8)
+puts "Line 270: Framebuffer created"
 
 GC.start
 
 # === Deep Clean: チップメモリをリセット ===
+puts "Line 274: Starting Deep Clean..."
 send_command(spi, cs, dc, 0x10, "DTM1")
 send_data_chunked(spi, cs, dc, "\x00" * 4736, "DTM1_all_black")
+puts "Line 277: DTM1 sent"
 
 send_command(spi, cs, dc, 0x13, "DTM2")
 send_data_chunked(spi, cs, dc, "\xFF" * 4736, "DTM2_all_white")
@@ -270,27 +290,38 @@ qr_x = (WIDTH - qr_display_size) / 2
 qr_y = 30
 
 # === 描画実行 ===
+puts "Line 293: Drawing text..."
 draw_text(@framebuffer, text_x, text_y, text, 0, :ascii12)
 GC.start
+puts "Line 296: Text drawn"
 
+puts "Line 298: Drawing QR code..."
 draw_qr_code(@framebuffer, qr_x, qr_y, QR_DATA, qr_module_size, QR_WIDTH)
 GC.start
+puts "Line 301: QR code drawn"
 
 # === 画面更新 ===
+puts "Line 304: Starting display update..."
 send_command(spi, cs, dc, 0x10, "DTM1")
 send_data_chunked(spi, cs, dc, "\xFF" * 4736, "DTM1.data")
+puts "Line 307: DTM1 sent"
 
 GC.start
 
+puts "Line 310: Sending framebuffer..."
 send_command(spi, cs, dc, 0x13, "DTM2")
 send_data_chunked(spi, cs, dc, @framebuffer, "DTM2.data")
+puts "Line 313: DTM2 sent"
 
 GC.start
 
+puts "Line 316: Triggering display refresh..."
 send_command(spi, cs, dc, 0x12, "DRF")
 wait_until_idle(busy)
 sleep_ms(1000)
+puts "Line 320: Display refresh complete"
 
+puts "Line 322: Powering off..."
 send_command(spi, cs, dc, 0x02, "POF")
 
 GC.start
