@@ -247,7 +247,7 @@ end
 # display_data は配列形式 (各行は文字列)
 def draw_display(fb, display_data_array, display_width, display_height)
   display_height.times do |y|  # 0-127
-    row = display_data_array[y]  # y番目の行を取得
+    row = display_data_array[y].reverse  # y番目の行を取得して反転
     display_width.times do |x|  # 0-295
       bit = row[x]  # row[x] で x 番目の文字取得
       color = (bit == '1') ? 1 : 0
