@@ -75,10 +75,11 @@ bit_idx  = 7 - (x % 8)          # MSB-first
 ```
 
 **Coordinate System**:
-- Origin: (0, 0) = bottom-left
+- Origin: (0, 0) = top-left
 - X-axis: 0→127 (left to right)
-- Y-axis: 0→295 (bottom to top)
+- Y-axis: 0→295 (top to bottom)
 - Bit representation: 0=black, 1=white
+- Note: PSR SCAN_UP controls UC8151 gate driver direction, not frame buffer layout
 
 ---
 

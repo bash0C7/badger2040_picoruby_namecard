@@ -126,9 +126,11 @@ end
 # draw_text: テキスト文字列を Terminus フォントで描画
 def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
-    current_x = x
-    widths.each_with_index do |char_width, char_idx|
-      height.times do |row|
+    # FIXED: Iterate rows first (outer), then characters (inner)
+    # This ensures characters render horizontally
+    height.times do |row|
+      current_x = x  # Reset X for each row
+      widths.each_with_index do |char_width, char_idx|
         glyph_data = glyphs[char_idx][row]
         char_width.times do |col|
           pixel = (glyph_data >> (char_width - 1 - col)) & 1
@@ -137,8 +139,8 @@ def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
           display_y = y + row
           set_pixel(fb, display_x, display_y, pixel_color)
         end
+        current_x += char_width  # Advance X for next character
       end
-      current_x += char_width
     end
   end
 end
