@@ -37,6 +37,30 @@ def wait_until_idle(busy)
   while busy.read == 0; sleep_ms(10); end
 end
 
+# === Drawing Primitives ===
+
+# set_pixel: フレームバッファ内の単一ピクセルを設定
+# fb: フレームバッファ（文字列）
+# x, y: 座標（原点左下、0-127, 0-295）
+# color: 0=黒、1=白
+def set_pixel(fb, x, y, color)
+  # 範囲チェック
+  return if x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT
+
+  # メモリレイアウト: 行指向、MSB first
+  byte_idx = (y * WIDTH + x) / 8
+  bit_idx = 7 - (x % 8)
+
+  old_val = fb[byte_idx].ord
+  if color == 0  # 黒
+    new_val = old_val & ~(1 << bit_idx)
+  else  # 白
+    new_val = old_val | (1 << bit_idx)
+  end
+  fb[byte_idx] = new_val.chr
+end
+
+
 # === 初期化 ===
 spi = SPI.new(unit: :RP2040_SPI0, frequency: 2_000_000, sck_pin: 18, copi_pin: 19, mode: 0)
 cs   = GPIO.new(17, GPIO::OUT); cs.write(1)
@@ -100,26 +124,59 @@ GC.start
 
 # === 描画テスト：左下 5x5 の黒領域 ===
 # 座標系: 原点左下、x軸=左→右、y軸=下→上
-# 行指向メモリレイアウト: byte_idx = (y * WIDTH + x) / 8
-# MSB first: bit_idx = 7 - (x % 8)
 p "draw_simple_test"
 pixel_count = 0
 drawn_bytes = {}
 
 (0..4).each do |y|
   (0..4).each do |x|
+    set_pixel(@framebuffer, x, y, 0)  # 0=黒
     byte_idx = (y * WIDTH + x) / 8
-    bit_idx = 7 - (x % 8)
-    puts "pix#{pixel_count}: x=#{x} y=#{y} byte=#{byte_idx} bit=#{bit_idx}"
-    old_val = @framebuffer[byte_idx].ord
-    new_val = old_val & ~(1 << bit_idx)
-    @framebuffer[byte_idx] = new_val.chr
     drawn_bytes[byte_idx] = true
     pixel_count += 1
   end
 end
 
 p "draw_simple_test: #{pixel_count} pixels"
+
+GC.start
+
+# === set_pixel() テストケース ===
+p "set_pixel_test: detailed verification"
+
+# テスト1: 原点 (0, 0) に黒ピクセル
+test_fb = "\xFF" * 4736
+set_pixel(test_fb, 0, 0, 0)
+test_val = test_fb[0].ord
+expected_bit = 7  # 原点は byte_idx=0, bit_idx=7
+is_set = (test_val & (1 << expected_bit)) == 0 ? true : false
+puts "Test1 (0,0) black: byte[0]=0x#{test_val.to_s(16).rjust(2, '0')} bit#{expected_bit} set=#{is_set}"
+
+# テスト2: 右上 (127, 295) に黒ピクセル
+test_fb2 = "\xFF" * 4736
+set_pixel(test_fb2, 127, 295, 0)
+byte_idx_expected = (295 * WIDTH + 127) / 8
+bit_idx_expected = 7 - (127 % 8)
+test_val2 = test_fb2[byte_idx_expected].ord
+is_set2 = (test_val2 & (1 << bit_idx_expected)) == 0 ? true : false
+puts "Test2 (127,295) black: byte[#{byte_idx_expected}]=0x#{test_val2.to_s(16).rjust(2, '0')} bit#{bit_idx_expected} set=#{is_set2}"
+
+# テスト3: 白ピクセルの復元
+test_fb3 = "\x00" * 4736  # 全黒スタート
+set_pixel(test_fb3, 0, 0, 1)  # 白に設定
+test_val3 = test_fb3[0].ord
+is_white = (test_val3 & (1 << 7)) == 0 ? false : true
+puts "Test3 (0,0) white: byte[0]=0x#{test_val3.to_s(16).rjust(2, '0')} bit7 white=#{is_white}"
+
+# テスト4: 範囲外のピクセル（ハンドルされるべき）
+test_fb4 = "\xFF" * 4736
+orig_byte = test_fb4[0].ord
+set_pixel(test_fb4, 128, 0, 0)  # x=128 は範囲外
+set_pixel(test_fb4, 0, 296, 0)  # y=296 は範囲外
+new_byte = test_fb4[0].ord
+puts "Test4 (128,0) and (0,296) out of bounds: byte[0] unchanged=#{orig_byte == new_byte}"
+
+p "set_pixel_test: done"
 
 GC.start
 
