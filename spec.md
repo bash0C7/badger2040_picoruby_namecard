@@ -83,6 +83,8 @@ bit_idx  = 7 - (5 % 8) = 7 - 5 = 2
 
 ### Initialization Sequence (Verified Working)
 
+**Source**: Verified against UC8151 datasheet and confirmed working in app.rb (lines 49-76)
+
 ```ruby
 # 1. Hardware reset
 rst.write(0)
@@ -109,7 +111,7 @@ CMD 0x01, DATA [0x03, 0x00, 0x2B, 0x2B, 0x1E]
 CMD 0x06, DATA [0x17, 0x17, 0x17]
 
 # 5. PLL (Clock Frequency) - 0x30
-CMD 0x30, DATA [0x3C]  # 60Hz
+CMD 0x30, DATA [0x3C]  # Frequency setting code
 
 # 6. PON (Power On) - 0x04
 CMD 0x04
@@ -138,15 +140,33 @@ wait_until_idle(busy)
 
 #### Normal Update
 ```ruby
-# Standard refresh cycle
-CMD 0x10, DATA [0xFF * 4736]  # DTM1 (white baseline)
-CMD 0x13, DATA [framebuffer]  # DTM2 (new image)
+# Standard refresh cycle (for subsequent updates)
+CMD 0x04  # PON (Power on - required if display was powered off)
+wait_until_idle(busy)
+
+# Optional but recommended for reliability (from MicroPython reference):
+CMD 0x92  # PTOU (Partial mode off - ensures full refresh, not partial)
+
+# Image transfer
+CMD 0x10, DATA [0xFF * 4736]  # DTM1 (white baseline for comparison)
+CMD 0x13, DATA [framebuffer]  # DTM2 (new image to display)
+
+# Optional but recommended:
+CMD 0x11  # DSP (Data stop - flush data pipeline before refresh)
+
+# Refresh
 CMD 0x12  # DRF (Display Refresh)
 wait_until_idle(busy)
 
 # Power off
-CMD 0x02  # POF
+CMD 0x02  # POF (Power off - save energy)
 ```
+
+**Important Notes**:
+- **PON required**: Must be called if display was previously powered off (POF)
+- **PTOU/DSP optional**: These commands are recommended for reliable multi-update operation
+- **Single-update programs**: Like app.rb (one-shot namecard), can omit PON (already active) and PTOU/DSP
+- **Multi-update loops**: Must include PON and should include PTOU/DSP
 
 ### Important Commands
 
@@ -289,5 +309,33 @@ Display on 128×296 horizontal badge:
 
 ---
 
+## Implementation Source Requirements
+
+**All implementations MUST be grounded in verified sources**:
+
+### Verified Sources
+1. **UC8151 Datasheet** (primary reference)
+   - https://www.crystalfontz.com/controllers/datasheet-viewer.php?id=511
+   - Register definitions, command sequences, timing diagrams
+
+2. **Working Code Examples** (ground truth)
+   - app.rb (Phase 1 verified on hardware)
+   - C++ Pimoroni reference: https://github.com/pimoroni/pimoroni-pico/blob/main/drivers/uc8151/uc8151.cpp
+   - MicroPython antirez: https://github.com/antirez/uc8151_micropython/blob/main/uc8151.py
+
+3. **Standard Algorithms** (where applicable)
+   - Bresenham line algorithm (computer graphics standard)
+   - Midpoint circle algorithm (computer graphics standard)
+   - Frame buffer row-major memory layout (standard embedded graphics)
+
+### Implementation Notes
+- **NO speculation** - every algorithm and value must come from above sources
+- When uncertain, consult reference implementation or datasheet first
+- Document algorithm source as inline comment
+- Test implementations against reference behavior
+
+---
+
 **Status**: Phase 1 Complete - Display controller initialized and tested
+**Verification Date**: 2026-02-01
 **Last Updated**: 2026-02-01
