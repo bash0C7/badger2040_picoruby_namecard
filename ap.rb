@@ -391,50 +391,24 @@ wait_until_idle(busy)
 GC.start
 
 # === 描画実行 ===
-puts "Line 293: Drawing display data..."
-puts "DISPLAY_DATA size: #{DISPLAY_DATA.size} (expected: #{DISPLAY_WIDTH * DISPLAY_HEIGHT})"
 draw_display(@framebuffer, DISPLAY_DATA, DISPLAY_WIDTH, DISPLAY_HEIGHT)
 GC.start
-puts "Line 295: Display data drawn"
-
-# === デバッグ: フレームバッファの最初と最後を確認 ===
-puts "DEBUG: FB first 10 bytes (hex):"
-(0...10).each { |i| puts "  [#{i}] = 0x#{@framebuffer[i].ord.to_s(16)}" }
-puts "DEBUG: FB last 10 bytes (hex):"
-((@framebuffer.size - 10)...@framebuffer.size).each { |i| puts "  [#{i}] = 0x#{@framebuffer[i].ord.to_s(16)}" }
-
-# 最初の行（Y=0）のピクセル状態を確認（8ピクセルごと）
-puts "DEBUG: Y=0 line pixels (first 16):"
-(0...16).each do |x|
-  byte_idx = (0 * WIDTH + x) / 8
-  bit_idx = 7 - (x % 8)
-  byte_val = @framebuffer[byte_idx].ord
-  bit_val = (byte_val >> bit_idx) & 1
-  puts "  [#{x}] byte=#{byte_idx} bit=#{bit_idx} val=#{bit_val}"
-end
 
 # === 画面更新 ===
-puts "Line 304: Starting display update..."
 send_command(spi, cs, dc, 0x10, "DTM1")
 send_data_chunked(spi, cs, dc, "\xFF" * 4736, "DTM1.data")
-puts "Line 307: DTM1 sent"
 
 GC.start
 
-puts "Line 310: Sending framebuffer..."
 send_command(spi, cs, dc, 0x13, "DTM2")
 send_data_chunked(spi, cs, dc, @framebuffer, "DTM2.data")
-puts "Line 313: DTM2 sent"
 
 GC.start
 
-puts "Line 316: Triggering display refresh..."
 send_command(spi, cs, dc, 0x12, "DRF")
 wait_until_idle(busy)
 sleep_ms(1000)
-puts "Line 320: Display refresh complete"
 
-puts "Line 322: Powering off..."
 send_command(spi, cs, dc, 0x02, "POF")
 
 GC.start
