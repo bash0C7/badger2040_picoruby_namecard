@@ -135,6 +135,50 @@ def draw_line(fb, x0, y0, x1, y1, color)
   end
 end
 
+# draw_circle: Midpoint Circle アルゴリズムで円を描画
+# fb: フレームバッファ（文字列）
+# cx, cy: 円の中心座標
+# radius: 半径（ピクセル）
+# color: 0=黒、1=白
+# filled: true=塗りつぶし、false=輪郭のみ
+# 参考: Midpoint Circle algorithm - https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
+# 最適化: 8-way symmetry で計算量を1/8に削減
+def draw_circle(fb, cx, cy, radius, color, filled = false)
+  x = radius
+  y = 0
+  d = 3 - 2 * radius  # Decision parameter
+
+  while x >= y
+    # 8-way symmetry で8個のピクセルを描画
+    if filled
+      # フィルされた円：水平線で塗りつぶし
+      draw_line(fb, cx - x, cy + y, cx + x, cy + y, color)
+      draw_line(fb, cx - x, cy - y, cx + x, cy - y, color) if y != 0
+      draw_line(fb, cx - y, cy + x, cx + y, cy + x, color) if x != y
+      draw_line(fb, cx - y, cy - x, cx + y, cy - x, color) if y != 0 && x != y
+    else
+      # 円輪郭：8-way symmetry で点を描画
+      set_pixel(fb, cx + x, cy + y, color)
+      set_pixel(fb, cx - x, cy + y, color)
+      set_pixel(fb, cx + x, cy - y, color)
+      set_pixel(fb, cx - x, cy - y, color)
+      set_pixel(fb, cx + y, cy + x, color)
+      set_pixel(fb, cx - y, cy + x, color)
+      set_pixel(fb, cx + y, cy - x, color) if x != y
+      set_pixel(fb, cx - y, cy - x, color) if x != y
+    end
+
+    # Decision parameter 更新
+    if d < 0
+      d = d + 4 * y + 6
+    else
+      d = d + 4 * (y - x) + 10
+      x -= 1
+    end
+    y += 1
+  end
+end
+
 
 # === 初期化 ===
 spi = SPI.new(unit: :RP2040_SPI0, frequency: 2_000_000, sck_pin: 18, copi_pin: 19, mode: 0)
@@ -342,6 +386,47 @@ end
 puts "Test4 short diagonal line (10,10)-(20,15): #{short_non_white} bytes modified"
 
 p "draw_line_test: done"
+
+# === draw_circle() テストケース ===
+p "draw_circle_test: detailed verification"
+
+# テスト1: 小さい円輪郭 (64, 148, r=10)
+test_fb_circle = "\xFF" * 4736
+draw_circle(test_fb_circle, 64, 148, 10, 0, false)  # 0=黒、false=輪郭
+circle_outline_bytes = 0
+(0...test_fb_circle.size).each do |i|
+  circle_outline_bytes += 1 if test_fb_circle[i].ord != 0xFF
+end
+puts "Test1 circle outline (64,148,r=10): #{circle_outline_bytes} bytes modified"
+
+# テスト2: フィルされた円 (64, 148, r=15)
+test_fb_circle2 = "\xFF" * 4736
+draw_circle(test_fb_circle2, 64, 148, 15, 0, true)  # 0=黒、true=塗りつぶし
+circle_filled_bytes = 0
+(0...test_fb_circle2.size).each do |i|
+  circle_filled_bytes += 1 if test_fb_circle2[i].ord != 0xFF
+end
+puts "Test2 circle filled (64,148,r=15): #{circle_filled_bytes} bytes modified"
+
+# テスト3: 非常に小さい円 (r=1)
+test_fb_circle3 = "\xFF" * 4736
+draw_circle(test_fb_circle3, 50, 50, 1, 0, false)  # 0=黒、false=輪郭
+tiny_circle_bytes = 0
+(0...test_fb_circle3.size).each do |i|
+  tiny_circle_bytes += 1 if test_fb_circle3[i].ord != 0xFF
+end
+puts "Test3 circle tiny (50,50,r=1): #{tiny_circle_bytes} bytes modified"
+
+# テスト4: 大きい円輪郭 (64, 148, r=40)
+test_fb_circle4 = "\xFF" * 4736
+draw_circle(test_fb_circle4, 64, 148, 40, 0, false)  # 0=黒、false=輪郭
+large_circle_bytes = 0
+(0...test_fb_circle4.size).each do |i|
+  large_circle_bytes += 1 if test_fb_circle4[i].ord != 0xFF
+end
+puts "Test4 circle outline (64,148,r=40): #{large_circle_bytes} bytes modified"
+
+p "draw_circle_test: done"
 
 GC.start
 
