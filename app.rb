@@ -618,8 +618,41 @@ p "framebuffer_scan: #{non_white_count} non-white bytes"
 
 GC.start
 
-# === 画面更新 ===
-# DTM1には真っ白を送ってリセット、DTM2に描画画像を送る
+# === レイアウト設計（Phase 5.1） ===
+# Option B: テキスト上中央、QR下（バランス最適）
+# 128×296 display, 原点左下
+
+# テキスト "bash0C7" の座標計算
+text = "bash0C7"  # 6×7 = 42 pixels wide
+text_width = FONT_WIDTH * text.size
+text_x = (WIDTH - text_width) / 2  # 中央配置
+text_y = 270  # 上部
+
+# QR コード の座標計算
+qr_width = QR_WIDTH  # 27 modules
+qr_module_size = 2   # 2 pixels/module = 54×54 pixels
+qr_display_size = qr_width * qr_module_size  # 54
+qr_x = (WIDTH - qr_display_size) / 2  # 中央配置
+qr_y = 30  # 下部
+
+p "Layout: text(#{text_x},#{text_y}) qr(#{qr_x},#{qr_y})"
+
+# === 描画実行（テキスト + QR） ===
+p "draw_namecard_start"
+GC.start
+
+draw_text(@framebuffer, text_x, text_y, text, 0, :ascii12)
+p "text_drawn"
+
+GC.start
+
+draw_qr_code(@framebuffer, qr_x, qr_y, QR_DATA, qr_module_size, QR_WIDTH)
+p "qr_drawn"
+
+GC.start
+
+# === 画面更新（最終） ===
+# DTM1には白を送ってリセット、DTM2に描画画像を送る
 send_command(spi, cs, dc, 0x10, "DTM1")
 send_data_chunked(spi, cs, dc, "\xFF" * 4736, "DTM1.data")
 
@@ -638,5 +671,5 @@ send_command(spi, cs, dc, 0x02, "POF")
 
 GC.start
 
-puts "Done: 5x5 black square at bottom-left (0,0)-(4,4)"
-puts "Result: Displayed at top-right (coordinate system origin is bottom-left)"
+puts "Done: bash0C7 namecard displayed"
+puts "Text at (#{text_x}, #{text_y}), QR at (#{qr_x}, #{qr_y})"
