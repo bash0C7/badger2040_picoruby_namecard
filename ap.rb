@@ -6,29 +6,19 @@ puts "Line 3: Loading GPIO..."
 require 'gpio'
 puts "Line 4: GPIO loaded"
 
-puts "Line 5: Loading Terminus..."
-require 'terminus'
-puts "Line 6: Terminus loaded"
-
-# === フォント データ定義 ===
-# Terminus 6x12 フォント（6×12）
-# 出典: picoruby-terminus mrbgem
-FONT_TERMINUS = :"6x12"
-FONT_WIDTH = 6
-FONT_HEIGHT = 12
-
 WIDTH  = 128
 HEIGHT = 296
 
-# === QR コード データ ===
-# 出典: qr.png を Python で抽出（128×128 ピクセル）
-QR_WIDTH = 128
-QR_HEIGHT = 128
-QR_DATA = "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
-          "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
-          "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
-          "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
-          "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
+# === ディスプレイ 統合 データ ===
+# QRコード(128x128) + テキスト(168x128)
+# 出典: ユーザー提供
+DISPLAY_WIDTH = 296
+DISPLAY_HEIGHT = 128
+DISPLAY_DATA = "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
+               "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
+               "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
+               "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
+               "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111" +
           "11110000000000000000000000000000000001111111111000011111111110000000000000000000111111111100000000000000000000000000000000011111" +
           "11110000000000000000000000000000000001111111111000011111111110000000000000000000111111111100000000000000000000000000000000011111" +
           "11110000000000000000000000000000000001111111111000011111111110000000000000000000111111111100000000000000000000000000000000011111" +
@@ -250,60 +240,17 @@ def draw_line(fb, x0, y0, x1, y1, color)
   end
 end
 
-# draw_text: テキスト文字列を Terminus フォントで描画
-def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
-  Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
-    # 文字ごとに描画（水平レンダリング）
-    current_x = x
-    widths.each_with_index do |char_width, char_idx|
-      glyph_data = glyphs[char_idx]
+# draw_display: 統合ビットマップデータを転置して描画
+# 物理画面 296x128 → フレームバッファ 128x296
+def draw_display(fb, display_data, display_width, display_height)
+  display_height.times do |y|  # 0-127
+    display_width.times do |x|  # 0-295
+      idx = y * display_width + x
+      bit = display_data[idx]
+      color = (bit == '1') ? 1 : 0
 
-      # 行を外側ループに、列を内側ループに
-      height.times do |row|
-        row_data = glyph_data[row]
-        char_width.times do |col|
-          pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
-          pixel_color = (pixel == 1) ? color : (1 - color)
-          display_x = current_x + col
-          display_y = y + row
-          set_pixel(fb, display_x, display_y, pixel_color)
-        end
-      end
-
-      # 次の文字位置へ移動
-      current_x += char_width
-    end
-  end
-end
-
-# draw_text_scaled: テキストをスケーリング付きで描画（各ピクセルをスケール倍で描画）
-def draw_text_scaled(fb, x, y, text, scale = 2, color = 0, font_name = :"6x12")
-  Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
-    # 文字ごとに描画（水平レンダリング）
-    current_x = x
-    widths.each_with_index do |char_width, char_idx|
-      glyph_data = glyphs[char_idx]
-
-      # 行を外側ループに、列を内側ループに
-      height.times do |row|
-        row_data = glyph_data[row]
-        char_width.times do |col|
-          pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
-          pixel_color = (pixel == 1) ? color : (1 - color)
-
-          # スケール倍で描画（各ピクセルを scale×scale ブロックで表現）
-          scale.times do |sy|
-            scale.times do |sx|
-              display_x = current_x + col * scale + sx
-              display_y = y + row * scale + sy
-              set_pixel(fb, display_x, display_y, pixel_color)
-            end
-          end
-        end
-      end
-
-      # 次の文字位置へ移動
-      current_x += char_width * scale
+      # 転置: 物理座標(x, y) → フレームバッファ座標(y, x)
+      set_pixel(fb, y, x, color)
     end
   end
 end
@@ -324,18 +271,6 @@ def draw_checkerboard(fb, x, y, width, height, cell_size)
           set_pixel(fb, px, py, color)
         end
       end
-    end
-  end
-end
-
-# draw_qr_code: 文字列データからQRコードを描画（set_pixel ベース）
-def draw_qr_code(fb, x, y, qr_data, qr_width, qr_height)
-  qr_height.times do |qr_y|
-    qr_width.times do |qr_x|
-      idx = qr_y * qr_width + qr_x
-      bit = qr_data[idx]
-      color = (bit == '1') ? 1 : 0  # '1' = 白、'0' = 黒
-      set_pixel(fb, x + qr_x, y + qr_y, color)
     end
   end
 end
@@ -441,33 +376,11 @@ wait_until_idle(busy)
 
 GC.start
 
-# === レイアウト設計 ===
-# テキスト：左側（2行）、QRコード：既存位置のまま
-text1 = "bash"           # 1行目（4文字、2倍サイズで 12×24 ピクセル）
-text2 = "@bash0C7"       # 2行目（8文字、通常サイズで 48×12 ピクセル）
-text_x = 5               # 左側のX座標
-text1_y = 20             # 1行目のY座標
-text2_y = 60             # 2行目のY座標（1行目の下）
-
-# QRコード（128×128、既存位置のまま）
-qr_x = 0   # 左端
-qr_y = 10  # 上部（既存）
-
 # === 描画実行 ===
-puts "Line 293: Drawing text1 (bash) with 2x scale..."
-draw_text_scaled(@framebuffer, text_x, text1_y, text1, 2, 0, :"6x12")
+puts "Line 293: Drawing display data..."
+draw_display(@framebuffer, DISPLAY_DATA, DISPLAY_WIDTH, DISPLAY_HEIGHT)
 GC.start
-puts "Line 295: Text1 drawn"
-
-puts "Line 297: Drawing text2 (@bash0C7) with normal scale..."
-draw_text(@framebuffer, text_x, text2_y, text2, 0, :"6x12")
-GC.start
-puts "Line 300: Text2 drawn"
-
-puts "Line 302: Drawing QR code..."
-draw_qr_code(@framebuffer, qr_x, qr_y, QR_DATA, QR_WIDTH, QR_HEIGHT)
-GC.start
-puts "Line 305: QR code drawn"
+puts "Line 295: Display data drawn"
 
 # === 画面更新 ===
 puts "Line 304: Starting display update..."
