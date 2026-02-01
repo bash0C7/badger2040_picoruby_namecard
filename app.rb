@@ -280,43 +280,16 @@ qr_display_size = qr_width * qr_module_size
 qr_x = (WIDTH - qr_display_size) / 2
 qr_y = 30
 
-# === 実証実験: 座標系検証 ===
-puts "Line 283: EXPERIMENTAL TEST MODE"
+# === 描画実行 ===
+puts "Line 293: Drawing text..."
+draw_text(@framebuffer, text_x, text_y, text, 0, :"6x12")
+GC.start
+puts "Line 296: Text drawn"
 
-# Test 1: 単一ピクセル at (0, 0)
-puts "Test 1: Single pixel at (0, 0)"
-set_pixel(@framebuffer, 0, 0, 0)
-puts "  Byte[0] after set_pixel(0,0,0): #{@framebuffer[0].ord.to_s(2).rjust(8, '0')}"
-
-# Test 2: 水平線 at y=150, x=0-10
-puts "Test 2: Horizontal line at y=150, x=0-10"
-10.times do |x|
-  set_pixel(@framebuffer, x, 150, 0)
-end
-puts "  Pixels set"
-
-# Test 3: 垂直線 at x=64, y=0-20
-puts "Test 3: Vertical line at x=64, y=0-20"
-20.times do |y|
-  set_pixel(@framebuffer, 64, y, 0)
-end
-puts "  Pixels set"
-
-# Test 4: Terminus output analysis
-puts "Test 4: Terminus.draw output analysis"
-Terminus.draw(:"6x12", "A", 1) do |height, total_width, widths, glyphs|
-  puts "  Height: #{height}"
-  puts "  Total width: #{total_width}"
-  puts "  Widths: #{widths.inspect}"
-  puts "  Glyphs count: #{glyphs.size}"
-  puts "  First glyph data:"
-  glyphs[0].each_with_index do |row_data, row_idx|
-    binary = row_data.to_s(2).rjust(8, '0')
-    puts "    Row #{row_idx}: #{binary} (0x#{row_data.to_s(16)})"
-  end
-end
-
-puts "Line 310: EXPERIMENTAL MODE COMPLETE - Ready for hardware test"
+puts "Line 298: Drawing QR code..."
+draw_qr_code(@framebuffer, qr_x, qr_y, QR_DATA, 1, QR_WIDTH)
+GC.start
+puts "Line 301: QR code drawn"
 
 # === 画面更新 ===
 puts "Line 304: Starting display update..."

@@ -3,17 +3,36 @@ DEVICE_PATH = "/Volumes/NO NAME/home/"
 
 task default: [:deploy, :monitor]
 
-desc "Compile app.rb to app.mrb"
+desc "Compile all .rb files in project root"
 task :compile do
-  puts "Compiling app.rb..."
-  sh "#{PICORUBY_BIN} app.rb"
-  puts "✓ Compiled app.mrb"
+  rb_files = Dir.glob("*.rb")
+  if rb_files.empty?
+    puts "❌ No .rb files found in project root"
+    exit 1
+  end
+
+  puts "Compiling #{rb_files.length} file(s)..."
+  rb_files.each do |rb_file|
+    mrb_file = rb_file.gsub(/\.rb$/, ".mrb")
+    puts "  Compiling #{rb_file} → #{mrb_file}..."
+    sh "#{PICORUBY_BIN} #{rb_file}"
+  end
+  puts "✓ Compilation complete!"
 end
 
 desc "Compile and deploy to Badger 2040"
 task deploy: :compile do
-  puts "Deploying to Badger 2040..."
-  sh "cp app.mrb '#{DEVICE_PATH}'"
+  mrb_files = Dir.glob("*.mrb")
+  if mrb_files.empty?
+    puts "❌ No .mrb files found after compilation"
+    exit 1
+  end
+
+  puts "Deploying #{mrb_files.length} file(s) to Badger 2040..."
+  mrb_files.each do |mrb_file|
+    puts "  Copying #{mrb_file}..."
+    sh "cp '#{mrb_file}' '#{DEVICE_PATH}'"
+  end
   puts "✓ Deployment complete!"
 end
 
@@ -30,6 +49,12 @@ end
 
 desc "Clean compiled files"
 task :clean do
-  rm_f "app.mrb"
-  puts "✓ Cleaned"
+  mrb_files = Dir.glob("*.mrb")
+  if mrb_files.empty?
+    puts "ℹ No .mrb files to clean"
+  else
+    puts "Removing #{mrb_files.length} compiled file(s)..."
+    rm_f mrb_files
+    puts "✓ Cleaned"
+  end
 end
