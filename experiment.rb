@@ -74,7 +74,8 @@ def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
     widths.each_with_index do |char_width, char_idx|
       glyph_data = glyphs[char_idx]
       height.times do |row|
-        row_data = glyph_data[row]
+        actual_row = height - 1 - row  # 行を逆順に読む
+        row_data = glyph_data[actual_row]
         char_width.times do |col|
           pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
           pixel_color = (pixel == 1) ? color : (1 - color)
@@ -95,7 +96,8 @@ def draw_text_scaled(fb, x, y, text, scale = 2, color = 0, font_name = :"6x12")
     widths.each_with_index do |char_width, char_idx|
       glyph_data = glyphs[char_idx]
       height.times do |row|
-        row_data = glyph_data[row]
+        actual_row = height - 1 - row  # 行を逆順に読む
+        row_data = glyph_data[actual_row]
         char_width.times do |col|
           pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
           pixel_color = (pixel == 1) ? color : (1 - color)
