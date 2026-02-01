@@ -4,6 +4,13 @@ require 'gpio'
 require 'terminus'
 p "require"
 
+# === フォント データ定義 ===
+# Shinonome ascii12 フォント（6×12）
+# 出典: picoruby-shinonome mrbgem
+FONT_SHINONOME = :ascii12
+FONT_WIDTH = 6
+FONT_HEIGHT = 12
+
 WIDTH  = 128
 HEIGHT = 296
 
@@ -137,6 +144,46 @@ def draw_line(fb, x0, y0, x1, y1, color)
         err += dy
       end
       y += sy
+    end
+  end
+end
+
+# draw_text: テキスト文字列を Shinonome フォントで描画
+# fb: フレームバッファ（文字列）
+# x, y: 左下のコーナー座標（原点左下）
+# text: 描画するテキスト（UTF-8 文字列）
+# color: 0=黒、1=白
+# font_name: Shinonome フォント（:ascii12, :ascii16, :go12, など）
+# 出典: picoruby-shinonome mrbgem
+# 参考: https://github.com/picoruby/picoruby/tree/main/mrbgems/picoruby-shinonome
+def draw_text(fb, x, y, text, color = 0, font_name = :ascii12)
+  # Shinonome フォント レンダリング
+  Shinonome.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
+    # 各文字を描画
+    current_x = x
+    widths.each_with_index do |char_width, char_idx|
+      # グリフの各行を処理
+      height.times do |row|
+        # グリフデータ（uint64_t）からビット抽出
+        glyph_data = glyphs[char_idx][row]
+
+        # 各列（ピクセル）を処理
+        char_width.times do |col|
+          # ビット位置: MSB优先、左→右
+          # (char_width - 1 - col) で左から右へ
+          pixel = (glyph_data >> (char_width - 1 - col)) & 1
+
+          # ピクセル描画（1=前景色=黒、0=背景色=白）
+          pixel_color = (pixel == 1) ? color : (1 - color)
+          display_x = current_x + col
+          display_y = y + row
+
+          set_pixel(fb, display_x, display_y, pixel_color)
+        end
+      end
+
+      # 次の文字へ
+      current_x += char_width
     end
   end
 end
@@ -512,6 +559,47 @@ end
 puts "Test3 QR code (50,100,1px/module): #{qr3_non_white} bytes modified"
 
 p "draw_qr_code_test: done"
+
+# === draw_text() テストケース ===
+p "draw_text_test: detailed verification"
+
+# テスト1: "bash0C7" テキスト（英数字、小）
+test_fb_text = "\xFF" * 4736
+draw_text(test_fb_text, 0, 100, "bash0C7", 0, :ascii12)
+text1_non_white = 0
+(0...test_fb_text.size).each do |i|
+  text1_non_white += 1 if test_fb_text[i].ord != 0xFF
+end
+puts "Test1 draw_text('bash0C7', 0, 100): #{text1_non_white} bytes modified"
+
+# テスト2: 別の位置に テキスト描画
+test_fb_text2 = "\xFF" * 4736
+draw_text(test_fb_text2, 40, 50, "Test", 0, :ascii12)
+text2_non_white = 0
+(0...test_fb_text2.size).each do |i|
+  text2_non_white += 1 if test_fb_text2[i].ord != 0xFF
+end
+puts "Test2 draw_text('Test', 40, 50): #{text2_non_white} bytes modified"
+
+# テスト3: 単一文字
+test_fb_text3 = "\xFF" * 4736
+draw_text(test_fb_text3, 10, 10, "A", 0, :ascii12)
+text3_non_white = 0
+(0...test_fb_text3.size).each do |i|
+  text3_non_white += 1 if test_fb_text3[i].ord != 0xFF
+end
+puts "Test3 draw_text('A', 10, 10): #{text3_non_white} bytes modified"
+
+# テスト4: 白色テキスト（黒背景）
+test_fb_text4 = "\x00" * 4736  # 全黒背景
+draw_text(test_fb_text4, 20, 30, "Hi", 1, :ascii12)  # 白テキスト
+text4_non_black = 0
+(0...test_fb_text4.size).each do |i|
+  text4_non_black += 1 if test_fb_text4[i].ord != 0x00
+end
+puts "Test4 draw_text('Hi', 20, 30, color=1): #{text4_non_black} bytes modified"
+
+p "draw_text_test: done"
 
 GC.start
 
