@@ -147,13 +147,13 @@ end
 def draw_qr_code(fb, x, y, qr_data, module_size, qr_width)
   puts "  Parsing QR data (#{qr_data.size} bits)..."
   qr_height = qr_width
+  qr_size = qr_width * qr_height
 
-  qr_data.each_char.with_index do |char, idx|
+  qr_size.times do |idx|
+    char = qr_data[idx]
     bit = char == '1' ? 1 : 0
     mx = idx % qr_width
     my = idx / qr_width
-
-    break if my >= qr_height
 
     color = (bit == 1) ? 0 : 1
     display_x = x + mx * module_size
