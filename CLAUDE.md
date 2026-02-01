@@ -176,9 +176,12 @@ CMD 0x02                         # POF (power off)
 
 **Deploy Steps**:
 ```bash
-picorbc app.rb                    # Generate app.mrb
-cp app.mrb /Volumes/NO\ NAME/home/  # Copy to device
+rake           # Compile and deploy to Badger 2040
+rake compile   # Compile only (generates app.mrb)
+rake clean     # Clean compiled files
 ```
+
+See `Rakefile` for task details.
 
 ---
 
