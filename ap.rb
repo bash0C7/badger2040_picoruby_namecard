@@ -6,6 +6,18 @@ puts "Line 3: Loading GPIO..."
 require 'gpio'
 puts "Line 4: GPIO loaded"
 
+# === PicoRuby互換性: String#reverseメソッドの定義 ===
+# PicoRubyには String#reverse がないため、手動実装
+class String
+  def reverse
+    result = ""
+    (self.size - 1).downto(0) do |i|
+      result = result + self[i]
+    end
+    result
+  end
+end
+
 WIDTH  = 128
 HEIGHT = 296
 
