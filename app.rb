@@ -7,6 +7,12 @@ p "require"
 WIDTH  = 128
 HEIGHT = 296
 
+# === QR コード データ ===
+# 出典: qr.png を Python で解析して抽出（27×27 モジュール）
+QR_WIDTH = 27
+QR_HEIGHT = 27
+QR_DATA = "\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\x80"
+
 def send_command(spi, cs, dc, cmd, label = "")
   puts ">CMD #{label} 0x#{cmd.to_s(16).rjust(2, '0')}" unless label.empty?
   dc.write(0); cs.write(0); spi.write(cmd.chr); cs.write(1)
@@ -132,6 +138,53 @@ def draw_line(fb, x0, y0, x1, y1, color)
       end
       y += sy
     end
+  end
+end
+
+# draw_qr_code: QR コード データから QR コードを描画
+# fb: フレームバッファ（文字列）
+# x, y: 左下のコーナー座標（原点左下）
+# qr_data: QR モジュール データ（hex string）
+# module_size: 1 モジュール当たりの display ピクセル数
+# qr_width: QR コード幅（モジュール数、通常 21-29）
+# 出典: TODO.md Task 3.2 + qr.png を Python で解析したデータ
+def draw_qr_code(fb, x, y, qr_data, module_size, qr_width = 27)
+  # hex string をバイナリに変換
+  qr_bytes = []
+  i = 0
+  while i < qr_data.size
+    if qr_data[i] == '\\'
+      hex_chars = qr_data[i+1..i+2]
+      qr_bytes.push(hex_chars.to_i(16))
+      i += 3
+    else
+      i += 1
+    end
+  end
+
+  # バイナリデータをモジュールに展開
+  qr_bits = []
+  qr_bytes.each do |byte|
+    8.times do |bit|
+      qr_bits.push((byte >> (7 - bit)) & 1)
+    end
+  end
+
+  # QR モジュールを描画
+  qr_height = qr_width
+  qr_bits[0...qr_width * qr_height].each_with_index do |bit, idx|
+    mx = idx % qr_width
+    my = idx / qr_width
+
+    # bit: 1=黒、0=白
+    color = (bit == 1) ? 0 : 1
+
+    # display 上の座標（module_size × module_size のブロック）
+    display_x = x + mx * module_size
+    display_y = y + my * module_size
+
+    # rectangle を描画
+    fill_rect(fb, display_x, display_y, module_size, module_size, color)
   end
 end
 
@@ -427,6 +480,38 @@ end
 puts "Test4 circle outline (64,148,r=40): #{large_circle_bytes} bytes modified"
 
 p "draw_circle_test: done"
+
+# === draw_qr_code() テストケース ===
+p "draw_qr_code_test: detailed verification"
+
+# テスト1: QR コード描画（2 pixels/module = 54×54 pixels）
+test_fb_qr = "\xFF" * 4736
+draw_qr_code(test_fb_qr, 0, 0, QR_DATA, 2, QR_WIDTH)
+qr_non_white = 0
+(0...test_fb_qr.size).each do |i|
+  qr_non_white += 1 if test_fb_qr[i].ord != 0xFF
+end
+puts "Test1 QR code (0,0,2px/module): #{qr_non_white} bytes modified"
+
+# テスト2: QR コード位置の確認（異なるモジュールサイズ）
+test_fb_qr2 = "\xFF" * 4736
+draw_qr_code(test_fb_qr2, 10, 50, QR_DATA, 3, QR_WIDTH)  # 3 pixels/module = 81×81
+qr2_non_white = 0
+(0...test_fb_qr2.size).each do |i|
+  qr2_non_white += 1 if test_fb_qr2[i].ord != 0xFF
+end
+puts "Test2 QR code (10,50,3px/module): #{qr2_non_white} bytes modified"
+
+# テスト3: 縮小 QR（1 pixel/module = 27×27）
+test_fb_qr3 = "\xFF" * 4736
+draw_qr_code(test_fb_qr3, 50, 100, QR_DATA, 1, QR_WIDTH)
+qr3_non_white = 0
+(0...test_fb_qr3.size).each do |i|
+  qr3_non_white += 1 if test_fb_qr3[i].ord != 0xFF
+end
+puts "Test3 QR code (50,100,1px/module): #{qr3_non_white} bytes modified"
+
+p "draw_qr_code_test: done"
 
 GC.start
 
