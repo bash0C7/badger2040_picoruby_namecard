@@ -227,14 +227,77 @@ def draw_circle(fb, cx, cy, radius, color)
   # Draw circle outline or filled
 end
 
-def draw_qr_code(fb, x, y, qr_data)
-  # Draw QR code from binary data
+def draw_qr_code(fb, x, y, qr_data, qr_width, qr_height)
+  # Draw QR code from string data
+  # qr_data: String of '0' (black) and '1' (white) characters
+  # qr_width, qr_height: Dimensions (128×128)
+  # Verified working: Hardware test on 2026-02-01 ✅
 end
 
 def draw_text(fb, x, y, text, font)
   # Draw text using font bitmap
 end
 ```
+
+## QR Code Implementation Details
+
+### QR Data Format ✅ (Verified Working)
+
+```ruby
+QR_WIDTH = 128
+QR_HEIGHT = 128
+QR_DATA = "11111111...1111" * 128  # Total: 16,384 characters
+
+# Format:
+# - Single string of '0' and '1' characters (no spaces)
+# - Row-major order: [row0(128 chars)][row1(128 chars)]...[row127(128 chars)]
+# - Indexing: idx = y * QR_WIDTH + x
+# - Color mapping: '1'=white(1), '0'=black(0)
+```
+
+### Implementation
+
+```ruby
+def draw_qr_code(fb, x, y, qr_data, qr_width, qr_height)
+  qr_height.times do |qr_y|
+    qr_width.times do |qr_x|
+      idx = qr_y * qr_width + qr_x
+      bit = qr_data[idx]
+      color = (bit == '1') ? 1 : 0
+      set_pixel(fb, x + qr_x, y + qr_y, color)
+    end
+  end
+end
+```
+
+**Key Design**:
+- Uses set_pixel() for per-pixel rendering (proven reliable)
+- No bit manipulation or byte array complexity
+- Row-major string indexing matches frame buffer layout
+- Compatible with all QR sizes (generic qr_width/qr_height)
+
+### Layout (Verified on Hardware)
+
+```
+Display (128×296):
+┌─────────────────────────────┐
+│ QRCode (128×128)            │  Y: 10 ~ 137
+│ Starting at (0, 10)         │
+│                             │
+│                             │
+│                             │
+├─────────────────────────────┤
+│ "bash0C7" text              │  Y: 260 (pending Phase 4)
+└─────────────────────────────┘
+```
+
+### Hardware Test Result ✅
+
+- **Date**: 2026-02-01
+- **Result**: QR code displays correctly and is scannable
+- **Placement**: Confirmed at coordinates (0, 10)
+- **Pattern**: All finder patterns and timing marks visible
+- **Color**: Black/white contrast correct
 
 ## Expected Deliverables
 
@@ -251,15 +314,17 @@ end
 - Implement efficient pixel setting
 - Test coordinate system thoroughly
 
-### Phase 3: QR Code Display
-- Parse QR code image (qr.png)
-- Convert to frame buffer format
-- Position correctly on display
-- Combine with text
+### Phase 3: QR Code Display ✅ (COMPLETED)
+- ✅ Parse QR code image (qr.png) to 128×128 pixels
+- ✅ Convert to string format (128×128 = 16,384 characters "0" and "1")
+- ✅ Implement draw_qr_code() function (set_pixel based)
+- ✅ Position correctly at (x=0, y=10) on display
+- ✅ Hardware test: QR code displays and is scannable
+- ✅ Color mapping verified: '1'=white, '0'=black
 
 ### Phase 4: Text Display
-- Integrate font rendering (Shinonome or similar)
-- Draw text at specified positions
+- Integrate font rendering (Terminus 6x12)
+- Draw text at specified positions (x=5, y=260)
 - Combine text and QR code layout
 
 ### Phase 5: Final Integration
@@ -342,6 +407,17 @@ Display on 128×296 horizontal badge:
 
 ---
 
-**Status**: Phase 1 Complete - Display controller initialized and tested
-**Verification Date**: 2026-02-01
+## Development Status
+
+| Phase | Task | Status | Date |
+|-------|------|--------|------|
+| 1 | Core Display Control | ✅ COMPLETE | 2026-02-01 |
+| 2 | Drawing Primitives | ⏳ IN PROGRESS | - |
+| 3 | QR Code Display | ✅ COMPLETE | 2026-02-01 |
+| 4 | Text Display | ⏳ IN PROGRESS | - |
+| 5 | Final Integration | ⏳ PENDING | - |
+
+**Current Focus**: Phase 4 - Text Display (Terminus font rendering)
+
+**Last Major Achievement**: QRコード実装完了 (Hardware verified) - 2026-02-01
 **Last Updated**: 2026-02-01
