@@ -145,25 +145,31 @@ end
 
 # draw_qr_code: QR コード データから QR コードを描画
 def draw_qr_code(fb, x, y, qr_data, module_size, qr_width = 27)
+  puts "  Parsing QR data..."
   qr_bytes = []
   i = 0
   while i < qr_data.size
     if qr_data[i] == '\\'
       hex_chars = qr_data[i+1..i+2]
+      puts "    Hex pair: #{hex_chars.inspect}"
       qr_bytes.push(hex_chars.to_i(16))
       i += 3
     else
       i += 1
     end
   end
+  puts "  QR bytes parsed: #{qr_bytes.size} bytes"
 
+  puts "  Converting bytes to bits..."
   qr_bits = []
   qr_bytes.each do |byte|
     8.times do |bit|
       qr_bits.push((byte >> (7 - bit)) & 1)
     end
   end
+  puts "  Total bits: #{qr_bits.size}"
 
+  puts "  Drawing QR modules..."
   qr_height = qr_width
   qr_bits[0...qr_width * qr_height].each_with_index do |bit, idx|
     mx = idx % qr_width
@@ -173,6 +179,7 @@ def draw_qr_code(fb, x, y, qr_data, module_size, qr_width = 27)
     display_y = y + my * module_size
     fill_rect(fb, display_x, display_y, module_size, module_size, color)
   end
+  puts "  QR code drawn"
 end
 
 # draw_circle: Midpoint Circle アルゴリズムで円を描画
