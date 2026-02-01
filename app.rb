@@ -77,6 +77,64 @@ def fill_rect(fb, x, y, width, height, color)
   end
 end
 
+# draw_line: Bresenham アルゴリズムで直線を描画
+# fb: フレームバッファ（文字列）
+# x0, y0, x1, y1: 開始座標と終了座標
+# color: 0=黒、1=白
+# 参考: Bresenham line algorithm - https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+# 最適化: 水平線・垂直線は fill_rect() で処理
+def draw_line(fb, x0, y0, x1, y1, color)
+  dx = (x1 - x0).abs
+  dy = (y1 - y0).abs
+  sx = x0 < x1 ? 1 : -1
+  sy = y0 < y1 ? 1 : -1
+
+  # 水平線の最適化
+  if dy == 0
+    fill_rect(fb, [x0, x1].min, y0, (dx + 1), 1, color)
+    return
+  end
+
+  # 垂直線の最適化
+  if dx == 0
+    fill_rect(fb, x0, [y0, y1].min, 1, (dy + 1), color)
+    return
+  end
+
+  # Bresenham アルゴリズム（一般的な直線）
+  if dx > dy
+    # x駆動
+    err = dx / 2
+    y = y0
+    x = x0
+    while true
+      set_pixel(fb, x, y, color)
+      break if x == x1
+      err -= dy
+      if err < 0
+        y += sy
+        err += dx
+      end
+      x += sx
+    end
+  else
+    # y駆動
+    err = dy / 2
+    x = x0
+    y = y0
+    while true
+      set_pixel(fb, x, y, color)
+      break if y == y1
+      err -= dx
+      if err < 0
+        x += sx
+        err += dy
+      end
+      y += sy
+    end
+  end
+end
+
 
 # === 初期化 ===
 spi = SPI.new(unit: :RP2040_SPI0, frequency: 2_000_000, sck_pin: 18, copi_pin: 19, mode: 0)
@@ -243,6 +301,47 @@ end
 puts "Test4 (0,0,16,16) white rect: #{white_rect_bytes} bytes modified"
 
 p "fill_rect_test: done"
+
+# === draw_line() テストケース ===
+p "draw_line_test: detailed verification"
+
+# テスト1: 水平線 (0, 10) -> (20, 10)
+test_fb_line = "\xFF" * 4736
+draw_line(test_fb_line, 0, 10, 20, 10, 0)  # 0=黒
+hline_non_white = 0
+(0...test_fb_line.size).each do |i|
+  hline_non_white += 1 if test_fb_line[i].ord != 0xFF
+end
+puts "Test1 horizontal line (0,10)-(20,10): #{hline_non_white} bytes modified"
+
+# テスト2: 垂直線 (50, 0) -> (50, 50)
+test_fb_line2 = "\xFF" * 4736
+draw_line(test_fb_line2, 50, 0, 50, 50, 0)  # 0=黒
+vline_non_white = 0
+(0...test_fb_line2.size).each do |i|
+  vline_non_white += 1 if test_fb_line2[i].ord != 0xFF
+end
+puts "Test2 vertical line (50,0)-(50,50): #{vline_non_white} bytes modified"
+
+# テスト3: 対角線 (0, 0) -> (50, 50) (45度)
+test_fb_line3 = "\xFF" * 4736
+draw_line(test_fb_line3, 0, 0, 50, 50, 0)  # 0=黒
+diag_non_white = 0
+(0...test_fb_line3.size).each do |i|
+  diag_non_white += 1 if test_fb_line3[i].ord != 0xFF
+end
+puts "Test3 diagonal line (0,0)-(50,50): #{diag_non_white} bytes modified"
+
+# テスト4: 短い斜線 (10, 10) -> (20, 15)
+test_fb_line4 = "\xFF" * 4736
+draw_line(test_fb_line4, 10, 10, 20, 15, 0)  # 0=黒
+short_non_white = 0
+(0...test_fb_line4.size).each do |i|
+  short_non_white += 1 if test_fb_line4[i].ord != 0xFF
+end
+puts "Test4 short diagonal line (10,10)-(20,15): #{short_non_white} bytes modified"
+
+p "draw_line_test: done"
 
 GC.start
 
