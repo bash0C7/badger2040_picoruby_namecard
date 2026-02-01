@@ -145,10 +145,15 @@ CMD 0x02                         # POF (power off)
 - UC8151 initialization (9 steps)
 - Frame buffer creation and management
 - Deep clean execution
-- Coordinate system verification: 5×5 black square at (0,0)-(4,4) displays correctly
+- Coordinate system verification: CONFIRMED with diagnostic test (experiment_coords.rb)
+  - Origin: (0, 0) = top-left ✅
+  - X-axis: 0→127 (left to right) ✅
+  - Y-axis: 0→295 (top to bottom) ✅
+  - set_pixel() implementation 100% correct
 - Display refresh cycle
 
 **Reference**: `app.rb` lines 49-157 (verified working)
+**Coordinate System Verified**: 2026-02-01 via experiment_coords.rb (4-corner diagnostic test)
 
 ---
 

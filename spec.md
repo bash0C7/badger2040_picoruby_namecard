@@ -37,21 +37,27 @@ CS=17, DC=20, RST=21, BUSY=26
 
 **Physical Layout** (horizontal badge):
 ```
-    (0,295) ←── y-axis ──┐
-       ┌────────────┐     │
-       │            │     │ upward
-       │   Screen   │     ↓
+    (0,0) ──→ x-axis (127,0)
+       ┌────────────┐
+       │            │
+   y-axis            │ downward
+       │   Screen   │  ↓
        │            │
        └────────────┘
-    (0,0) ──→ x-axis (127,0)
-         left      right
+  (0,295) ─────────── (127,295)
+    left                right
 
-Origin: bottom-left
+Origin: top-left (0,0)
 X-axis: left → right (0 to 127)
-Y-axis: bottom → up (0 to 295)
+Y-axis: top → bottom (0 to 295)
 ```
 
-**Important**: When code specifies (0,0), it refers to the bottom-left corner of the physical display.
+**Important**: When code specifies (0,0), it refers to the top-left corner of the physical display.
+
+**Verified**: Coordinate system confirmed via diagnostic test (experiment_coords.rb) on 2026-02-01
+- 4-corner test pattern with varying line lengths and thickness
+- All patterns displayed at expected positions
+- set_pixel() implementation is 100% correct
 
 ## Frame Buffer Memory Layout
 
