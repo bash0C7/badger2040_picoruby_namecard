@@ -39,6 +39,8 @@ def draw_text_debug(text, font_name = :"6x12")
   puts "=== draw_text_debug: #{text.inspect} ==="
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     puts "height=#{height}, total_width=#{total_width}"
+    puts "glyph_data class: #{glyphs[0].class}"
+    puts "glyph_data size: #{glyphs[0].size}"
 
     widths.each_with_index do |char_width, char_idx|
       puts ""
@@ -47,7 +49,7 @@ def draw_text_debug(text, font_name = :"6x12")
 
       height.times do |row|
         row_data = glyph_data[row]
-        puts "  row #{row}: 0x#{row_data.to_s(16)}"
+        puts "  row #{row}: 0x#{row_data.to_s(16)} (class: #{row_data.class})"
 
         # ビット抽出を2パターン試す
         bits_order1 = ""
@@ -213,222 +215,21 @@ puts ""
 puts "Line 132: DEBUG complete, proceeding to hypothesis tests"
 puts ""
 
-# === 仮説別テキスト描画テスト ===
-puts "Line 283: HYPOTHESIS-BASED TEXT RENDERING TEST"
+# === 修正版 draw_text() テスト ===
+puts "Line 216: CORRECTED TEXT RENDERING TEST"
 puts ""
 
-# 1文字 'b' で複数の仮説をテスト
+# 修正版 draw_text() で "b" を描画
 test_char = "b"
 text_x = 5
-font_name = :"6x12"
+test_y = 20
 
-# ==============================================
-# 仮説1: 現在の実装（char → height ループ）
-# ==============================================
-puts "=== H1: Current (char → height) at Y=20-32 ==="
-test1_y = 20
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H1: height=#{height}, char_width=#{widths[0]}"
-  current_x = text_x
-  widths.each_with_index do |char_width, char_idx|
-    glyph_data = glyphs[char_idx]
-    puts "H1: Processing char at x=#{current_x}"
-    height.times do |row|
-      row_data = glyph_data[row]
-      char_width.times do |col|
-        pixel = (row_data >> (char_width - 1 - col)) & 1
-        pixel_color = (pixel == 1) ? 0 : 1
-        display_x = current_x + col
-        display_y = test1_y + row
-        set_pixel(@framebuffer, display_x, display_y, pixel_color)
-      end
-    end
-    current_x += char_width
-  end
-end
-
-# ==============================================
-# 仮説2: height → char ループ反転
-# ==============================================
-puts ""
-puts "=== H2: Reversed (height → char) at Y=50-62 ==="
-test2_y = 50
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H2: height=#{height}, char_width=#{widths[0]}"
-  height.times do |row|
-    current_x = text_x
-    widths.each_with_index do |char_width, char_idx|
-      glyph_data = glyphs[char_idx]
-      row_data = glyph_data[row]
-      puts "H2: row=#{row}, x=#{current_x}"
-      char_width.times do |col|
-        pixel = (row_data >> (char_width - 1 - col)) & 1
-        pixel_color = (pixel == 1) ? 0 : 1
-        display_x = current_x + col
-        display_y = test2_y + row
-        set_pixel(@framebuffer, display_x, display_y, pixel_color)
-      end
-      current_x += char_width
-    end
-  end
-end
-
-# ==============================================
-# 仮説3: glyph_data[col] アクセス（column indexed?）
-# ==============================================
-puts ""
-puts "=== H3: Column-indexed (glyph_data[col]) at Y=80-92 ==="
-test3_y = 80
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H3: height=#{height}, char_width=#{widths[0]}"
-  current_x = text_x
-  widths.each_with_index do |char_width, char_idx|
-    glyph_data = glyphs[char_idx]
-    puts "H3: Trying column-indexed access"
-    char_width.times do |col|
-      height.times do |row|
-        begin
-          row_data = glyph_data[col]
-          if row_data.nil?
-            puts "H3: glyph_data[#{col}] is nil"
-          else
-            pixel = (row_data >> (height - 1 - row)) & 1
-            pixel_color = (pixel == 1) ? 0 : 1
-            display_x = current_x + col
-            display_y = test3_y + row
-            set_pixel(@framebuffer, display_x, display_y, pixel_color)
-          end
-        rescue
-          puts "H3: Error accessing glyph_data[#{col}]"
-        end
-      end
-    end
-    current_x += char_width
-  end
-end
-
-# ==============================================
-# 仮説4: Column-first ループ + row_dataのheight方向ビット抽出
-# ==============================================
-puts ""
-puts "=== H4: Column-first (col → row) at Y=100-112 ==="
-test4_y = 100
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H4: height=#{height}, char_width=#{widths[0]}"
-  current_x = text_x
-  widths.each_with_index do |char_width, char_idx|
-    glyph_data = glyphs[char_idx]
-    puts "H4: Processing char at x=#{current_x}"
-    # 外側: 列（左から右）
-    char_width.times do |col|
-      # 内側: 行（上から下）
-      height.times do |row|
-        row_data = glyph_data[col]
-        if row_data.nil?
-          puts "H4: glyph_data[#{col}] is nil"
-        else
-          # ビット抽出: height方向（上から下）
-          pixel = (row_data >> (height - 1 - row)) & 1
-          pixel_color = (pixel == 1) ? 0 : 1
-          display_x = current_x + col
-          display_y = test4_y + row
-          set_pixel(@framebuffer, display_x, display_y, pixel_color)
-        end
-      end
-    end
-    current_x += char_width
-  end
-end
-
-# ==============================================
-# 仮説5: Row反転 + LSB-first ビット抽出
-# ==============================================
-puts ""
-puts "=== H5: Row-reversed + LSB-first bit extraction at Y=130-142 ==="
-test5_y = 130
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H5: height=#{height}, char_width=#{widths[0]}"
-  current_x = text_x
-  widths.each_with_index do |char_width, char_idx|
-    glyph_data = glyphs[char_idx]
-    puts "H5: Processing char at x=#{current_x}"
-    # 外側: 列（左から右）
-    char_width.times do |col|
-      # 内側: 行（上から下）
-      height.times do |row|
-        # row方向を反転（glyph_data[height-1-row]でアクセス）
-        row_data = glyph_data[height - 1 - row]
-
-        # ビット抽出: LSB-first（右から左）
-        pixel = (row_data >> col) & 1
-        pixel_color = (pixel == 1) ? 0 : 1
-        display_x = current_x + col
-        display_y = test5_y + row
-        set_pixel(@framebuffer, display_x, display_y, pixel_color)
-      end
-    end
-    current_x += char_width
-  end
-end
-
-# ==============================================
-# 仮説6: Row反転 + MSB-first ビット抽出
-# ==============================================
-puts ""
-puts "=== H6: Row-reversed + MSB-first at Y=160-172 ==="
-test6_y = 160
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H6: height=#{height}, char_width=#{widths[0]}"
-  current_x = text_x
-  widths.each_with_index do |char_width, char_idx|
-    glyph_data = glyphs[char_idx]
-    puts "H6: Processing char at x=#{current_x}"
-    char_width.times do |col|
-      height.times do |row|
-        # row方向を反転
-        row_data = glyph_data[height - 1 - row]
-        # ビット抽出: MSB-first（左から右）
-        pixel = (row_data >> (char_width - 1 - col)) & 1
-        pixel_color = (pixel == 1) ? 0 : 1
-        display_x = current_x + col
-        display_y = test6_y + row
-        set_pixel(@framebuffer, display_x, display_y, pixel_color)
-      end
-    end
-    current_x += char_width
-  end
-end
-
-# ==============================================
-# 仮説7: Row正常 + LSB-first ビット抽出
-# ==============================================
-puts ""
-puts "=== H7: Row-normal + LSB-first at Y=190-202 ==="
-test7_y = 190
-Terminus.draw(font_name, test_char, 1) do |height, total_width, widths, glyphs|
-  puts "H7: height=#{height}, char_width=#{widths[0]}"
-  current_x = text_x
-  widths.each_with_index do |char_width, char_idx|
-    glyph_data = glyphs[char_idx]
-    puts "H7: Processing char at x=#{current_x}"
-    char_width.times do |col|
-      height.times do |row|
-        # row方向は正常
-        row_data = glyph_data[row]
-        # ビット抽出: LSB-first（右から左）
-        pixel = (row_data >> col) & 1
-        pixel_color = (pixel == 1) ? 0 : 1
-        display_x = current_x + col
-        display_y = test7_y + row
-        set_pixel(@framebuffer, display_x, display_y, pixel_color)
-      end
-    end
-    current_x += char_width
-  end
-end
+puts "=== draw_text() CORRECTED VERSION at Y=20-32 ==="
+draw_text(@framebuffer, text_x, test_y, test_char, 0, :"6x12")
+puts "draw_text() complete"
 
 puts ""
-puts "Line 310: HYPOTHESIS TEST COMPLETE - Ready for inspection"
+puts "Line 225: TEXT RENDERING TEST COMPLETE - Ready for inspection"
 
 # === 画面更新 ===
 puts "Line 304: Starting display update..."
