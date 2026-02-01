@@ -68,14 +68,13 @@ def draw_text_debug(text, font_name = :"6x12")
 end
 
 # draw_text: テキスト文字列を Terminus フォントで描画
-# 修正版: glyph_data は上下反転で返されるので height-1-row でアクセス
 def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     current_x = x
     widths.each_with_index do |char_width, char_idx|
       glyph_data = glyphs[char_idx]
       height.times do |row|
-        row_data = glyph_data[height - 1 - row]  # 行を反転
+        row_data = glyph_data[row]
         char_width.times do |col|
           pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
           pixel_color = (pixel == 1) ? color : (1 - color)
@@ -90,14 +89,13 @@ def draw_text(fb, x, y, text, color = 0, font_name = :"6x12")
 end
 
 # draw_text_scaled: テキストをスケーリング付きで描画
-# 修正版: glyph_data は上下反転で返されるので height-1-row でアクセス
 def draw_text_scaled(fb, x, y, text, scale = 2, color = 0, font_name = :"6x12")
   Terminus.draw(font_name, text, 1) do |height, total_width, widths, glyphs|
     current_x = x
     widths.each_with_index do |char_width, char_idx|
       glyph_data = glyphs[char_idx]
       height.times do |row|
-        row_data = glyph_data[height - 1 - row]  # 行を反転
+        row_data = glyph_data[row]
         char_width.times do |col|
           pixel = (row_data >> (char_width - 1 - col)) & 1  # MSB-first
           pixel_color = (pixel == 1) ? color : (1 - color)
