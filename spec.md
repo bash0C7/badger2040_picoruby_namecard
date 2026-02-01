@@ -6,7 +6,7 @@ Display QR codes and text on Badger 2040 (RP2040 + UC8151 E-ink controller) usin
 
 **Key Goal**:
 - Initialize UC8151 display controller
-- Draw QR code and text on 128×296 pixel e-ink screen
+- Draw QR code and text on 縦128×横296 pixel e-ink screen
 - Display "bash0C7 <QRCode>" on the namecard
 - Keep image on screen without power (e-ink characteristic)
 
@@ -15,10 +15,10 @@ Display QR codes and text on Badger 2040 (RP2040 + UC8151 E-ink controller) usin
 ### Badger 2040
 - **MCU**: RP2040 (Raspberry Pi Pico)
 - **Display**: UC8151 / IL0373 E-ink controller
-- **Resolution**: 128 × 296 pixels
+- **Resolution**: 縦128 × 横296 pixels
 - **Aspect Ratio**: Horizontal badge (296mm wide × 128mm tall)
 - **Color Depth**: 1-bit (black/white only)
-- **Frame Buffer Size**: 4,736 bytes (128 × 296 ÷ 8)
+- **Frame Buffer Size**: 4,736 bytes (縦128 × 横296 ÷ 8)
 
 ### Pin Assignment
 ```
@@ -412,12 +412,12 @@ Display on 128×296 horizontal badge:
 | Phase | Task | Status | Date |
 |-------|------|--------|------|
 | 1 | Core Display Control | ✅ COMPLETE | 2026-02-01 |
-| 2 | Drawing Primitives | ⏳ IN PROGRESS | - |
+| 2 | Drawing Primitives | ✅ COMPLETE | 2026-02-01 |
 | 3 | QR Code Display | ✅ COMPLETE | 2026-02-01 |
-| 4 | Text Display | ⏳ IN PROGRESS | - |
-| 5 | Final Integration | ⏳ PENDING | - |
+| 4 | Text Display | ✅ COMPLETE | 2026-02-01 |
+| 5 | Final Integration | ✅ COMPLETE | 2026-02-01 |
 
-**Current Focus**: Phase 4 - Text Display (Terminus font rendering)
+**Current Status**: All phases complete - Full namecard display working
 
-**Last Major Achievement**: QRコード実装完了 (Hardware verified) - 2026-02-01
+**Latest Achievement**: テキスト左右反転問題を解決 - String#reverseメソッドの実装と全行反転による修正 (Hardware verified) - 2026-02-01
 **Last Updated**: 2026-02-01
