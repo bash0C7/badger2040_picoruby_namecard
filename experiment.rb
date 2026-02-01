@@ -10,8 +10,8 @@ puts "Line 5: Loading Terminus..."
 require 'terminus'
 puts "Line 6: Terminus loaded"
 
-WIDTH  = 128
-HEIGHT = 296
+WIDTH  = 128  # 論理的な幅（MicroPythonと同じ）
+HEIGHT = 296  # 論理的な高さ（MicroPythonと同じ）
 
 def set_pixel(fb, x, y, color)
   return if x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT
@@ -159,7 +159,7 @@ puts "Line 233: Hardware reset complete"
 # UC8151C 初期化（128x296モード）
 puts "Line 235: Starting UC8151 initialization..."
 send_command(spi, cs, dc, 0x00, "PSR")
-send_data(spi, cs, dc, "\x5F", "PSR.data")
+send_data(spi, cs, dc, "\x93", "PSR.data")  # 0x93: bit7-6=10 RES_128x296, SCAN_DOWN, SHIFT_LEFT (候補2)
 
 send_command(spi, cs, dc, 0x01, "PWR")
 send_data(spi, cs, dc, "\x03\x00\x2b\x2b\x1e", "PWR.data")
